@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% load static %}
+    <meta charset="utf-8"/>
+    <title>Chat Room</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src = "https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.js"></script>
+    <script src = "{% static 'js/functions.js' %}"></script>
+    <script src = "{% static 'js/instruments.js' %}"></script>
+    <script src = "{% static 'js/editor.js' %}"></script>
+</head>
+<body style = "background-color:aliceblue;">
+    <textarea id="chat-log" cols="100" rows="20"></textarea><br>
+    <input id="chat-message-input" type="text" size="100"><br>
+    <input id="chat-message-submit" type="button" value="Send"><br>
+    Your name:<div >{{username}}{{ username|json_script:"user-name"}}</div>
+    Room name:{{room_name}}<br>
+    Roommates: <br>{% for i in roommates %}
+        {% if i.name == username %}
+        {% else %}
+        {{i.name}}
+        {% if status == 'Creator' %}
+        <select onchange="ChangeStatus(this)" id = "{{i.name}}">
+            <option id = "_editor">Editor</option>
+            <option id = "_witness">Witness</option>
+        </select>
+    {% endif %}
+    <br>
+    {%endif%}
+    {% endfor %}<br>
+    Your status:{{status}}
+    {{ room_name|json_script:"room-name" }}
+    <main>
+        <input type = "button" class = "Mode" id = "SelectImage" value = "select"/>
+        <input type = "button" class = "Mode" id = "Text" value = "text"/>
+        <input type = "button" class = "Mode" id = "Marker" value = "marker"/>
+        <input type = "button" class = "Mode" id = "Fill" value = "fill"/>
+        <input type = "button" class = "Mode" id = "Pencil" value = "pencil"/>
+        <input type = "button" class = "Mode" id = "Eraser" value = "eraser"/>
+        <div id = "Content" style = "width: 800px; height: 600px; position: relative; left: 100px; top: 50px; overflow: hidden;"></div>
+    </main>
+
+    <script>
+        function ChangeStatus(selectObject) {
+            var value = selectObject.value;
+            chatSocket.send(JSON.stringify({
+                type: "change_status",
+                username: selectObject.getAttribute("id"),
+                status: value,
+            }));
+        }
+        const roomName = JSON.parse(document.getElementById('room-name').textContent);
+        const username = JSON.parse(document.getElementById('user-name').textContent);
+
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/' + roomName + '/'
+        );
+
+        chatSocket.onmessage = function(e) {
+
+            const data = JSON.parse(e.data);
+            document.querySelector('#chat-log').value += (data.username + ': ' + data.message + '\n');
+        };
+
+        chatSocket.onclose = function(e) {
+            chatSocket.send()
+            console.error('Chat socket closed unexpectedly');
+        };
+
+        document.querySelector('#chat-message-input').focus();
+        document.querySelector('#chat-message-input').onkeyup = function(e) {
+            if (e.keyCode === 13) {
+                document.querySelector('#chat-message-submit').click();
+            }
+        };
+
+
+        document.querySelector('#chat-message-submit').onclick = function(e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            chatSocket.send(JSON.stringify({
+                type: "chat",
+                message: message,
+                username:username,
+            }));
+            messageInputDom.value = '';
+        };
+    </script>
+</body>
+</html>
